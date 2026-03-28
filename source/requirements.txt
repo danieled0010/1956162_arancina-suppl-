@@ -1,0 +1,11 @@
+fastapi==0.115.8
+uvicorn[standard]==0.34.0
+httpx==0.28.1
+websockets==14.2
+aiohttp==3.11.13
+SQLAlchemy==2.0.39
+asyncpg==0.30.0
+numpy==2.2.3
+pydantic==2.10.6
+pydantic-settings==2.8.1
+python-dateutil==2.9.0.post0

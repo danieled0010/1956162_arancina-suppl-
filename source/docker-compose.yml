@@ -1,0 +1,131 @@
+services:
+  simulator:
+    image: seismic-signal-simulator:multiarch_v1
+    container_name: simulator
+    ports:
+      - "8080:8080"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: seismic-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: seismic
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  broker:
+    build:
+      context: ./source
+      dockerfile: broker/Dockerfile
+    container_name: seismic-broker
+    environment:
+      BROKER_SIMULATOR_BASE_URL: http://simulator:8080
+      BROKER_SENSOR_DISCOVERY_INTERVAL_SECONDS: 20
+      BROKER_RECONNECT_BACKOFF_SECONDS: 2
+    depends_on:
+      - simulator
+    ports:
+      - "8090:8090"
+
+  processor-a:
+    build:
+      context: ./source
+      dockerfile: processor/Dockerfile
+    container_name: processor-a
+    environment:
+      PROCESSOR_PROCESSOR_ID: processor-a
+      PROCESSOR_BROKER_WS_URL: ws://broker:8090/api/stream/ws
+      PROCESSOR_SIMULATOR_CONTROL_URL: http://simulator:8080/api/control
+      PROCESSOR_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/seismic
+      PROCESSOR_WINDOW_SECONDS: 4
+      PROCESSOR_MINIMUM_SAMPLES_PER_WINDOW: 64
+      PROCESSOR_ANALYSIS_STRIDE_SAMPLES: 5
+      PROCESSOR_MIN_PEAK_TO_PEAK_AMPLITUDE: 1.2
+      PROCESSOR_STARTUP_RETRY_ATTEMPTS: 20
+      PROCESSOR_STARTUP_RETRY_DELAY_SECONDS: 2
+    depends_on:
+      - broker
+      - postgres
+      - simulator
+    restart: unless-stopped
+
+  processor-b:
+    build:
+      context: ./source
+      dockerfile: processor/Dockerfile
+    container_name: processor-b
+    environment:
+      PROCESSOR_PROCESSOR_ID: processor-b
+      PROCESSOR_BROKER_WS_URL: ws://broker:8090/api/stream/ws
+      PROCESSOR_SIMULATOR_CONTROL_URL: http://simulator:8080/api/control
+      PROCESSOR_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/seismic
+      PROCESSOR_WINDOW_SECONDS: 4
+      PROCESSOR_MINIMUM_SAMPLES_PER_WINDOW: 64
+      PROCESSOR_ANALYSIS_STRIDE_SAMPLES: 5
+      PROCESSOR_MIN_PEAK_TO_PEAK_AMPLITUDE: 1.2
+      PROCESSOR_STARTUP_RETRY_ATTEMPTS: 20
+      PROCESSOR_STARTUP_RETRY_DELAY_SECONDS: 2
+    depends_on:
+      - broker
+      - postgres
+      - simulator
+    restart: unless-stopped
+
+  processor-c:
+    build:
+      context: ./source
+      dockerfile: processor/Dockerfile
+    container_name: processor-c
+    environment:
+      PROCESSOR_PROCESSOR_ID: processor-c
+      PROCESSOR_BROKER_WS_URL: ws://broker:8090/api/stream/ws
+      PROCESSOR_SIMULATOR_CONTROL_URL: http://simulator:8080/api/control
+      PROCESSOR_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/seismic
+      PROCESSOR_WINDOW_SECONDS: 4
+      PROCESSOR_MINIMUM_SAMPLES_PER_WINDOW: 64
+      PROCESSOR_ANALYSIS_STRIDE_SAMPLES: 5
+      PROCESSOR_MIN_PEAK_TO_PEAK_AMPLITUDE: 1.2
+      PROCESSOR_STARTUP_RETRY_ATTEMPTS: 20
+      PROCESSOR_STARTUP_RETRY_DELAY_SECONDS: 2
+    depends_on:
+      - broker
+      - postgres
+      - simulator
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ./source
+      dockerfile: gateway/Dockerfile
+    container_name: seismic-gateway
+    environment:
+      GATEWAY_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/seismic
+      GATEWAY_PROCESSOR_URLS: http://processor-a:8091,http://processor-b:8091,http://processor-c:8091
+      GATEWAY_BROKER_BASE_URL: http://broker:8090
+      GATEWAY_SIMULATOR_BASE_URL: http://simulator:8080
+      GATEWAY_PROCESSOR_HEALTH_TIMEOUT_SECONDS: 2
+      GATEWAY_LIVE_POLL_INTERVAL_SECONDS: 1
+    depends_on:
+      - postgres
+      - processor-a
+      - processor-b
+      - processor-c
+    ports:
+      - "8088:8088"
+
+  frontend:
+    build:
+      context: ./source
+      dockerfile: frontend/Dockerfile
+    container_name: seismic-frontend
+    depends_on:
+      - gateway
+    ports:
+      - "5173:80"
+
+volumes:
+  postgres_data:
