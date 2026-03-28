@@ -66,3 +66,8 @@ export function buildUrl(baseUrl, path, params) {
   }
   return `${url.pathname}${url.search}`;
 }
+
+/** Same-origin gateway (Vite dev proxy, nginx in Docker). */
+export function apiUrl(path, params) {
+  return buildUrl('', path, params);
+}

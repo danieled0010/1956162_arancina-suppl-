@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  apiUrl,
   buildSinceIso,
-  buildUrl,
   eventTypeLabel,
   formatFixed,
   formatTimestamp,
 } from './lib/formatters';
 
-const API_BASE = import.meta.env.VITE_GATEWAY_BASE_URL || '';
 const DEFAULT_LIMIT = 200;
 const MAX_LIVE_ITEMS = 80;
 const MAX_TABLE_ITEMS = 600;
@@ -104,7 +103,7 @@ function App() {
   }, [sensorFilter, eventTypeFilter, currentSinceIso]);
 
   const fetchSystemOverview = useCallback(async () => {
-    const response = await fetch(buildUrl(API_BASE, '/api/system/overview'));
+    const response = await fetch(apiUrl('/api/system/overview'));
     if (!response.ok) {
       throw new Error(`Failed to fetch system overview (${response.status})`);
     }
@@ -113,7 +112,7 @@ function App() {
   }, []);
 
   const fetchProcessingSummary = useCallback(async () => {
-    const response = await fetch(buildUrl(API_BASE, '/api/processing/summary'));
+    const response = await fetch(apiUrl('/api/processing/summary'));
     if (!response.ok) {
       setSummary(null);
       return;
@@ -123,7 +122,7 @@ function App() {
   }, []);
 
   const fetchSensorCatalog = useCallback(async () => {
-    const response = await fetch(buildUrl(API_BASE, '/api/sensors'));
+    const response = await fetch(apiUrl('/api/sensors'));
     if (!response.ok) {
       return;
     }
@@ -137,7 +136,7 @@ function App() {
   }, [manualSensorId]);
 
   const fetchStreamStatus = useCallback(async () => {
-    const response = await fetch(buildUrl(API_BASE, '/api/events/stream-status'));
+    const response = await fetch(apiUrl('/api/events/stream-status'));
     if (!response.ok) {
       setStreamStatus(null);
       return;
@@ -148,7 +147,7 @@ function App() {
 
   const fetchAnalytics = useCallback(async () => {
     const params = buildFilterParams();
-    const response = await fetch(buildUrl(API_BASE, '/api/analytics/overview', params));
+    const response = await fetch(apiUrl('/api/analytics/overview', params));
     if (!response.ok) {
       setAnalytics(null);
       return;
@@ -168,7 +167,7 @@ function App() {
     };
 
     try {
-      const response = await fetch(buildUrl(API_BASE, '/api/events', params));
+      const response = await fetch(apiUrl('/api/events', params));
       if (!response.ok) {
         throw new Error(`Failed to fetch events (${response.status})`);
       }
@@ -233,7 +232,7 @@ function App() {
     // Replay a short recent window on connect so the "Live" panel is never blank
     // when there are already detected events persisted in the system.
     const streamStartId = Math.max(maxEventIdRef.current - 25, 0);
-    const streamUrl = buildUrl(API_BASE, '/api/events/live', {
+    const streamUrl = apiUrl('/api/events/live', {
       last_event_id: streamStartId,
     });
     const stream = new EventSource(streamUrl);
@@ -317,14 +316,14 @@ function App() {
 
   const handleCsvExport = useCallback(() => {
     const params = { limit: 5000, ...buildFilterParams() };
-    window.open(buildUrl(API_BASE, '/api/events/export.csv', params), '_blank', 'noopener,noreferrer');
+    window.open(apiUrl('/api/events/export.csv', params), '_blank', 'noopener,noreferrer');
   }, [buildFilterParams]);
 
   const openEventDetail = useCallback(async (eventId) => {
     setLoadingEventDetail(true);
     setActionError('');
     try {
-      const response = await fetch(buildUrl(API_BASE, `/api/events/by-id/${eventId}`));
+      const response = await fetch(apiUrl(`/api/events/by-id/${eventId}`));
       if (!response.ok) {
         throw new Error(`Failed to load event detail (${response.status})`);
       }
@@ -346,7 +345,7 @@ function App() {
     setActionMessage('');
     setActionError('');
     try {
-      const response = await fetch(buildUrl(API_BASE, `/api/admin/sensors/${manualSensorId}/events`), {
+      const response = await fetch(apiUrl(`/api/admin/sensors/${manualSensorId}/events`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ event_type: manualEventType }),
@@ -372,7 +371,7 @@ function App() {
     setActionMessage('');
     setActionError('');
     try {
-      const response = await fetch(buildUrl(API_BASE, '/api/admin/shutdown'), { method: 'POST' });
+      const response = await fetch(apiUrl('/api/admin/shutdown'), { method: 'POST' });
       if (!response.ok) {
         throw new Error(`Manual shutdown failed (${response.status})`);
       }
@@ -577,11 +576,13 @@ function App() {
           <ul className="live-list">
             {liveEvents.slice(0, 20).map((event) => (
               <li key={event.id} className="live-item">
-                <div>
-                  <strong>{sensorNameMap[event.sensor_id] || event.sensor_id}</strong>
-                  <span className={`badge ${eventTypeClass[event.event_type] || 'badge-default'}`}>
-                    {eventTypeLabel(event.event_type)}
-                  </span>
+                <div className="live-item-primary">
+                  <div className="live-item-title">
+                    <strong>{sensorNameMap[event.sensor_id] || event.sensor_id}</strong>
+                    <span className={`badge ${eventTypeClass[event.event_type] || 'badge-default'}`}>
+                      {eventTypeLabel(event.event_type)}
+                    </span>
+                  </div>
                 </div>
                 <div className="live-meta">
                   <span>{formatFixed(event.dominant_frequency_hz, 2)} Hz</span>
@@ -675,18 +676,18 @@ function App() {
               <tbody>
                 {events.map((event) => (
                   <tr key={event.id} onClick={() => openEventDetail(event.id)} className="clickable-row">
-                    <td>{formatTimestamp(event.created_at)}</td>
-                    <td>{sensorNameMap[event.sensor_id] || event.sensor_id}</td>
-                    <td>
+                    <td data-label="Time">{formatTimestamp(event.created_at)}</td>
+                    <td data-label="Sensor">{sensorNameMap[event.sensor_id] || event.sensor_id}</td>
+                    <td data-label="Type">
                       <span className={`badge ${eventTypeClass[event.event_type] || 'badge-default'}`}>
                         {eventTypeLabel(event.event_type)}
                       </span>
                     </td>
-                    <td>{formatFixed(event.dominant_frequency_hz, 3)} Hz</td>
-                    <td>{formatFixed(event.peak_to_peak_amplitude, 3)}</td>
-                    <td>{event.detected_by_replica}</td>
-                    <td>
-                      {formatTimestamp(event.window_start)} - {formatTimestamp(event.window_end)}
+                    <td data-label="Frequency">{formatFixed(event.dominant_frequency_hz, 3)} Hz</td>
+                    <td data-label="Amplitude">{formatFixed(event.peak_to_peak_amplitude, 3)}</td>
+                    <td data-label="Replica">{event.detected_by_replica}</td>
+                    <td data-label="Window">
+                      {formatTimestamp(event.window_start)} — {formatTimestamp(event.window_end)}
                     </td>
                   </tr>
                 ))}
