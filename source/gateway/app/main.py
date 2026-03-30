@@ -472,9 +472,9 @@ async def live_events(last_event_id: int = Query(default=0, ge=0)) -> StreamingR
                 for row in rows:
                     current_last_id = max(current_last_id, row.id)
                     payload = _to_event_out(row).model_dump(mode="json")
-                    yield f"event: detected_event\\ndata: {json.dumps(payload, separators=(',', ':'))}\\n\\n"
+                    yield f"event: detected_event\ndata: {json.dumps(payload, separators=(',', ':'))}\n\n"
             else:
-                yield "event: heartbeat\\ndata: {\"status\":\"alive\"}\\n\\n"
+                yield "event: heartbeat\ndata: {\"status\":\"alive\"}\n\n"
 
             await asyncio.sleep(settings.live_poll_interval_seconds)
 
