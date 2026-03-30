@@ -15,8 +15,12 @@ const MAX_TABLE_ITEMS = 600;
 const LIVE_WINDOW_MINUTES = 5;
 
 const TIME_WINDOW_OPTIONS = [
-  { value: '5m', label: '' },
-
+  { value: '5m', label: 'Last 5 minutes' },
+  { value: '15m', label: 'Last 15 minutes' },
+  { value: '1h', label: 'Last 1 hour' },
+  { value: '6h', label: 'Last 6 hours' },
+  { value: '24h', label: 'Last 24 hours' },
+  { value: 'all', label: 'All' },
 ];
 
 const EVENT_TYPE_OPTIONS = [
@@ -656,7 +660,7 @@ function App() {
         <section className="panel live-panel">
           <div className="panel-head">
             <h2>Live Detected Events</h2>
-            <span className="muted">Last {LIVE_WINDOW_MINUTES} min • {recentLiveEvents.length} shown</span>
+            <span className="muted">{recentLiveEvents.length} shown</span>
           </div>
 
           {!recentLiveEvents.length && (
