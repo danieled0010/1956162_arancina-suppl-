@@ -12,14 +12,11 @@ import {
 const DEFAULT_LIMIT = 200;
 const MAX_LIVE_ITEMS = 80;
 const MAX_TABLE_ITEMS = 600;
+const LIVE_WINDOW_MINUTES = 5;
 
 const TIME_WINDOW_OPTIONS = [
-  { value: '5m', label: 'Last 5 min' },
-  { value: '15m', label: 'Last 15 min' },
-  { value: '1h', label: 'Last 1 hour' },
-  { value: '6h', label: 'Last 6 hours' },
-  { value: '24h', label: 'Last 24 hours' },
-  { value: 'all', label: 'All' },
+  { value: '5m', label: '' },
+
 ];
 
 const EVENT_TYPE_OPTIONS = [
@@ -166,6 +163,9 @@ function App() {
       return;
     }
     const payload = await response.json();
+    if (typeof payload.latestEventId === 'number') {
+      maxEventIdRef.current = Math.max(maxEventIdRef.current, payload.latestEventId);
+    }
     setStreamStatus(payload);
   }, []);
 
@@ -179,6 +179,23 @@ function App() {
     const payload = await response.json();
     setAnalytics(payload);
   }, [buildFilterParams]);
+
+  const fetchLiveSnapshot = useCallback(async () => {
+    const response = await fetch(
+      apiUrl('/api/events', {
+        limit: MAX_LIVE_ITEMS,
+        order: 'desc',
+        since: buildSinceIso('5m'),
+      })
+    );
+    if (!response.ok) {
+      return;
+    }
+    const payload = await response.json();
+    setLiveEvents(payload);
+    const maxId = payload.reduce((max, item) => Math.max(max, item.id), maxEventIdRef.current);
+    maxEventIdRef.current = maxId;
+  }, []);
 
   const fetchEvents = useCallback(async () => {
     setLoadingEvents(true);
@@ -199,12 +216,6 @@ function App() {
       setEvents(payload);
       const maxId = payload.reduce((max, item) => Math.max(max, item.id), maxEventIdRef.current);
       maxEventIdRef.current = maxId;
-      setLiveEvents((current) => {
-        if (current.length > 0) {
-          return current;
-        }
-        return payload.slice(0, 20);
-      });
       setLastRefreshAt(new Date().toISOString());
     } catch (error) {
       setEventsError(error instanceof Error ? error.message : 'Failed to fetch events');
@@ -218,6 +229,7 @@ function App() {
     fetchProcessingSummary().catch(() => null);
     fetchSensorCatalog().catch(() => null);
     fetchStreamStatus().catch(() => null);
+    fetchLiveSnapshot().catch(() => null);
     const interval = window.setInterval(() => {
       fetchSystemOverview().catch(() => null);
       fetchProcessingSummary().catch(() => null);
@@ -225,7 +237,7 @@ function App() {
       fetchStreamStatus().catch(() => null);
     }, 5000);
     return () => window.clearInterval(interval);
-  }, [fetchProcessingSummary, fetchSensorCatalog, fetchSystemOverview, fetchStreamStatus]);
+  }, [fetchLiveSnapshot, fetchProcessingSummary, fetchSensorCatalog, fetchSystemOverview, fetchStreamStatus]);
 
   useEffect(() => {
     fetchEvents();
@@ -253,9 +265,9 @@ function App() {
       return undefined;
     }
 
-    // Replay a short recent window on connect so the "Live" panel is never blank
-    // when there are already detected events persisted in the system.
-    const streamStartId = Math.max(maxEventIdRef.current - 25, 0);
+    // Strict live mode: start from the latest known event id and only show
+    // events produced after the dashboard session is connected.
+    const streamStartId = Math.max(maxEventIdRef.current, 0);
     const streamUrl = apiUrl('/api/events/live', {
       last_event_id: streamStartId,
     });
@@ -296,6 +308,14 @@ function App() {
       setStreamConnected(false);
     };
   }, [matchesFilters, streamPaused]);
+
+  const recentLiveEvents = useMemo(() => {
+    const cutoffMs = Date.now() - LIVE_WINDOW_MINUTES * 60 * 1000;
+    return liveEvents.filter((event) => {
+      const createdAtMs = Date.parse(event.created_at);
+      return Number.isFinite(createdAtMs) && createdAtMs >= cutoffMs;
+    });
+  }, [liveEvents, lastHeartbeatAt]);
 
   const sensorNameMap = useMemo(() => {
     const map = {};
@@ -636,13 +656,15 @@ function App() {
         <section className="panel live-panel">
           <div className="panel-head">
             <h2>Live Detected Events</h2>
-            <span className="muted">{liveEvents.length} buffered</span>
+            <span className="muted">Last {LIVE_WINDOW_MINUTES} min • {recentLiveEvents.length} shown</span>
           </div>
 
-          {!liveEvents.length && <p className="empty-state">No live events yet. Trigger simulator disturbances to test.</p>}
+          {!recentLiveEvents.length && (
+            <p className="empty-state">No events detected in the last 5 minutes. Trigger simulator disturbances to test.</p>
+          )}
 
           <ul className="live-list">
-            {liveEvents.slice(0, 20).map((event) => (
+            {recentLiveEvents.slice(0, 20).map((event) => (
               <li key={event.id} className="live-item">
                 <div className="live-item-primary">
                   <div className="live-item-title">
