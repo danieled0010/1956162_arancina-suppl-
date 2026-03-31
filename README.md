@@ -12,16 +12,10 @@ The system ingests real-time sensor signals from the provided simulator, distrib
 docker load -i seismic-signal-simulator-oci.tar
 ```
 
-2. Start the full stack:
+2. Start the stack:
 
 ```bash
-docker compose -f source/docker-compose.yml up --build
-```
-
-3. Stop the stack when done:
-
-```bash
-docker compose -f source/docker-compose.yml down
+docker compose up --build
 ```
 
 ## Main URLs
