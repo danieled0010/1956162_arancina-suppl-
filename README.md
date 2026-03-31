@@ -29,7 +29,6 @@ docker compose -f source/docker-compose.yml down
 - Frontend dashboard: `http://localhost:5173`
 - Gateway API root: `http://localhost:8088`
 - Gateway health: `http://localhost:8088/health`
-- Gateway full health: `http://localhost:8088/health/full`
 - Broker health: `http://localhost:8090/health`
 - Simulator health: `http://localhost:8080/health`
 - Simulator docs: `http://localhost:8080/docs`
